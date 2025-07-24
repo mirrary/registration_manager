@@ -1,0 +1,26 @@
+# Конфиденциальные данные
+.env
+
+# База данных
+services_data.json
+
+# Виртуальное окружение
+venv/
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Логи
+*.log
+
+# Локальные настройки IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Файлы операционной системы
+.DS_Store
+Thumbs.db
