@@ -40,7 +40,8 @@ def owner_only(func):
         user_id = update.effective_user.id
         if user_id != OWNER_ID:
             await update.message.reply_text(
-                "Извините, у вас нет доступа к этому боту."
+                "Извините, у вас нет доступа к этому боту.",
+                parse_mode="HTML"
             )
             return
         return await func(update, context, *args, **kwargs)
@@ -62,14 +63,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "Привет! Я бот для управления аккаунтами Google.\n\n"
             "Похоже, у вас еще нет сгенерированных доменных имен. "
             "Хотите сгенерировать их сейчас?",
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            parse_mode="HTML"
         )
     else:
         await update.message.reply_text(
             "Привет! Я бот для управления аккаунтами Google.\n\n"
             "Отправьте мне название сервиса, для которого вы хотите использовать почту "
             "(например, 'groq', 'openai', 'anthropic').\n\n"
-            "Или используйте команду /generate для генерации новых доменных имен."
+            "Или используйте команду /generate для генерации новых доменных имен.",
+            parse_mode="HTML"
         )
 
 
@@ -84,7 +87,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "Доступные команды:\n"
         "/start - Начать работу с ботом\n"
         "/help - Показать эту справку\n"
-        "/generate - Сгенерировать доменные имена Gmail"
+        "/generate - Сгенерировать доменные имена Gmail",
+        parse_mode="HTML"
     )
 
 
@@ -93,8 +97,9 @@ async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """Обработчик команды /generate."""
     await update.message.reply_text(
         "Пожалуйста, отправьте базовую почту Gmail для генерации доменных имен.\n"
-        "Например: example@gmail.com\n\n"
-        "⚠️ Внимание! Это действие сотрет все предыдущие данные о привязках почт к сервисам!"
+        "Например: <code>example@gmail.com</code>\n\n"
+        "⚠️ Внимание! Это действие сотрет все предыдущие данные о привязках почт к сервисам!",
+        parse_mode="HTML"
     )
     return WAITING_EMAIL
 
@@ -103,8 +108,9 @@ async def start_generate_domains(query, context):
     """Начало процесса генерации доменных имен."""
     await query.edit_message_text(
         "Пожалуйста, отправьте базовую почту Gmail для генерации доменных имен.\n"
-        "Например: example@gmail.com\n\n"
-        "⚠️ Внимание! Это действие сотрет все предыдущие данные о привязках почт к сервисам!"
+        "Например: <code>example@gmail.com</code>\n\n"
+        "⚠️ Внимание! Это действие сотрет все предыдущие данные о привязках почт к сервисам!",
+        parse_mode="HTML"
     )
     return WAITING_EMAIL
 
@@ -118,14 +124,16 @@ async def process_email_for_generation(update: Update, context: ContextTypes.DEF
         count = db.generate_domain_names(email)
         
         await update.message.reply_text(
-            f"✅ Успешно сгенерировано {count} доменных имен на основе {email}.\n"
-            f"Все предыдущие привязки почт к сервисам были удалены."
+            f"✅ Успешно сгенерировано {count} доменных имен на основе <code>{email}</code>.\n"
+            f"Все предыдущие привязки почт к сервисам были удалены.",
+            parse_mode="HTML"
         )
         return ConversationHandler.END
     except ValueError as e:
         await update.message.reply_text(
             f"❌ Ошибка: {str(e)}\n"
-            f"Пожалуйста, отправьте корректную почту Gmail."
+            f"Пожалуйста, отправьте корректную почту Gmail.",
+            parse_mode="HTML"
         )
         return WAITING_EMAIL
 
@@ -148,6 +156,7 @@ async def handle_service_name(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"Выбран сервис: {service_name}\n"
         f"Что вы хотите сделать?",
         reply_markup=reply_markup,
+        parse_mode="HTML"
     )
 
 
@@ -160,7 +169,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_id = update.effective_user.id
     if user_id != OWNER_ID:
         await query.edit_message_text(
-            "Извините, у вас нет доступа к этому боту."
+            "Извините, у вас нет доступа к этому боту.",
+            parse_mode="HTML"
         )
         return
     
@@ -169,7 +179,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     service_name = context.user_data.get("service_name")
     if not service_name:
         await query.edit_message_text(
-            "Произошла ошибка. Пожалуйста, отправьте название сервиса заново."
+            "Произошла ошибка. Пожалуйста, отправьте название сервиса заново.",
+            parse_mode="HTML"
         )
         return
     
@@ -196,22 +207,25 @@ async def handle_registration(query, context, service_name):
         email_count = len(all_emails)
         
         await query.edit_message_text(
-            f"К сервису {service_name} уже привязана почта: {email}\n"
+            f"К сервису {service_name} уже привязана почта: <code>{email}</code>\n"
             f"Это почта #{email_count} для этого сервиса.\n"
             f"Хотите привязать новую почту?",
             reply_markup=reply_markup,
+            parse_mode="HTML"
         )
     else:
         if email == "Нет доступных почт":
             await query.edit_message_text(
                 f"К сожалению, все почты уже использованы. "
-                f"Пожалуйста, добавьте новые почты в файл."
+                f"Пожалуйста, добавьте новые почты в файл.",
+                parse_mode="HTML"
             )
         else:
             await query.edit_message_text(
-                f"Для сервиса {service_name} выделена почта: {email}\n"
+                f"Для сервиса {service_name} выделена почта: <code>{email}</code>\n"
                 f"Это первая почта для этого сервиса.\n"
-                f"Используйте её для регистрации."
+                f"Используйте её для регистрации.",
+                parse_mode="HTML"
             )
 
 
@@ -222,18 +236,21 @@ async def handle_view_email(query, service_name):
     if emails:
         if len(emails) == 1:
             await query.edit_message_text(
-                f"К сервису {service_name} привязана почта: {emails[0]}"
+                f"К сервису {service_name} привязана почта: <code>{emails[0]}</code>",
+                parse_mode="HTML"
             )
         else:
-            email_list = "\n".join([f"{i+1}. {email}" for i, email in enumerate(emails)])
+            email_list = "\n".join([f"{i+1}. <code>{email}</code>" for i, email in enumerate(emails)])
             await query.edit_message_text(
                 f"К сервису {service_name} привязаны следующие почты:\n\n{email_list}\n\n"
-                f"Последняя использованная: {emails[-1]}"
+                f"Последняя использованная: <code>{emails[-1]}</code>",
+                parse_mode="HTML"
             )
     else:
         await query.edit_message_text(
             f"К сервису {service_name} еще не привязана ни одна почта.\n"
-            f"Используйте кнопку 'Зарегистрироваться', чтобы привязать почту."
+            f"Используйте кнопку 'Зарегистрироваться', чтобы привязать почту.",
+            parse_mode="HTML"
         )
 
 
@@ -249,13 +266,15 @@ async def handle_assign_new(query, service_name):
         email_count = len(all_emails)
         
         await query.edit_message_text(
-            f"К сервису {service_name} привязана новая почта: {new_email}\n"
-            f"Это почта #{email_count} для этого сервиса."
+            f"К сервису {service_name} привязана новая почта: <code>{new_email}</code>\n"
+            f"Это почта #{email_count} для этого сервиса.",
+            parse_mode="HTML"
         )
     else:
         await query.edit_message_text(
             f"К сожалению, все почты уже использованы для этого сервиса. "
-            f"Пожалуйста, добавьте новые почты в файл."
+            f"Пожалуйста, добавьте новые почты в файл.",
+            parse_mode="HTML"
         )
 
 
