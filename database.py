@@ -1,5 +1,6 @@
 import json
 import os
+import itertools
 from typing import Dict, List, Optional, Tuple, Set, Union
 
 from config import GMAILS_FILE, DATABASE_FILE
@@ -142,3 +143,57 @@ class Database:
             return False, new_gmail
         
         return False, "Нет доступных почт"
+        
+    def generate_domain_names(self, email: str) -> int:
+        """
+        Генерирует все возможные комбинации доменных имен для Gmail и сохраняет их в файл.
+        Очищает все предыдущие данные о привязках сервисов.
+        
+        Args:
+            email: Базовая почта для генерации (например, example@gmail.com)
+            
+        Returns:
+            int: Количество сгенерированных почт
+        """
+        # Проверяем, что это Gmail
+        if not email.endswith('@gmail.com'):
+            raise ValueError("Почта должна быть Gmail (@gmail.com)")
+        
+        # Получаем имя пользователя (часть до @)
+        username = email.split('@')[0]
+        
+        # Генерируем все возможные комбинации с точками
+        generated_emails = []
+        
+        # Добавляем оригинальную почту
+        generated_emails.append(email)
+        
+        # Генерируем все возможные комбинации с точками
+        for i in range(1, len(username)):
+            # Получаем все возможные позиции для вставки точек
+            positions = list(itertools.combinations(range(1, len(username)), i))
+            
+            for pos in positions:
+                # Создаем новое имя пользователя с точками в указанных позициях
+                new_username = username
+                # Вставляем точки с конца, чтобы не сдвигать индексы
+                for p in sorted(pos, reverse=True):
+                    new_username = new_username[:p] + '.' + new_username[p:]
+                
+                # Добавляем новую почту в список
+                new_email = f"{new_username}@gmail.com"
+                generated_emails.append(new_email)
+        
+        # Сохраняем сгенерированные почты в файл
+        with open(GMAILS_FILE, 'w') as file:
+            for email in generated_emails:
+                file.write(f"{email}\n")
+        
+        # Обновляем список почт в памяти
+        self.gmails = generated_emails
+        
+        # Очищаем данные о привязках сервисов
+        self.services_data = {}
+        self._save_services_data()
+        
+        return len(generated_emails)

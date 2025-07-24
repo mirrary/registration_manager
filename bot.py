@@ -8,6 +8,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     ContextTypes,
     filters,
+    ConversationHandler,
 )
 
 from config import BOT_TOKEN, OWNER_ID
@@ -26,6 +27,10 @@ db = Database()
 REGISTER = "register"
 VIEW_EMAIL = "view_email"
 ASSIGN_NEW = "assign_new"
+GENERATE = "generate"
+
+# Константы для состояний ConversationHandler
+WAITING_EMAIL = 1
 
 
 def owner_only(func):
@@ -46,11 +51,26 @@ def owner_only(func):
 @owner_only
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /start."""
-    await update.message.reply_text(
-        "Привет! Я бот для управления аккаунтами Google.\n\n"
-        "Отправьте мне название сервиса, для которого вы хотите использовать почту "
-        "(например, 'groq', 'openai', 'anthropic')."
-    )
+    # Проверяем, есть ли почты в базе
+    if not db.gmails:
+        keyboard = [
+            [InlineKeyboardButton("Сгенерировать доменные имена", callback_data=GENERATE)]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            "Привет! Я бот для управления аккаунтами Google.\n\n"
+            "Похоже, у вас еще нет сгенерированных доменных имен. "
+            "Хотите сгенерировать их сейчас?",
+            reply_markup=reply_markup
+        )
+    else:
+        await update.message.reply_text(
+            "Привет! Я бот для управления аккаунтами Google.\n\n"
+            "Отправьте мне название сервиса, для которого вы хотите использовать почту "
+            "(например, 'groq', 'openai', 'anthropic').\n\n"
+            "Или используйте команду /generate для генерации новых доменных имен."
+        )
 
 
 @owner_only
@@ -63,8 +83,51 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "3. Следуйте инструкциям бота\n\n"
         "Доступные команды:\n"
         "/start - Начать работу с ботом\n"
-        "/help - Показать эту справку"
+        "/help - Показать эту справку\n"
+        "/generate - Сгенерировать доменные имена Gmail"
     )
+
+
+@owner_only
+async def generate_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик команды /generate."""
+    await update.message.reply_text(
+        "Пожалуйста, отправьте базовую почту Gmail для генерации доменных имен.\n"
+        "Например: example@gmail.com\n\n"
+        "⚠️ Внимание! Это действие сотрет все предыдущие данные о привязках почт к сервисам!"
+    )
+    return WAITING_EMAIL
+
+
+async def start_generate_domains(query, context):
+    """Начало процесса генерации доменных имен."""
+    await query.edit_message_text(
+        "Пожалуйста, отправьте базовую почту Gmail для генерации доменных имен.\n"
+        "Например: example@gmail.com\n\n"
+        "⚠️ Внимание! Это действие сотрет все предыдущие данные о привязках почт к сервисам!"
+    )
+    return WAITING_EMAIL
+
+
+async def process_email_for_generation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Обработка введенной почты для генерации доменных имен."""
+    email = update.message.text.strip()
+    
+    try:
+        # Генерируем доменные имена
+        count = db.generate_domain_names(email)
+        
+        await update.message.reply_text(
+            f"✅ Успешно сгенерировано {count} доменных имен на основе {email}.\n"
+            f"Все предыдущие привязки почт к сервисам были удалены."
+        )
+        return ConversationHandler.END
+    except ValueError as e:
+        await update.message.reply_text(
+            f"❌ Ошибка: {str(e)}\n"
+            f"Пожалуйста, отправьте корректную почту Gmail."
+        )
+        return WAITING_EMAIL
 
 
 @owner_only
@@ -100,6 +163,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "Извините, у вас нет доступа к этому боту."
         )
         return
+    
+    # Обработка кнопки GENERATE перенесена в отдельный ConversationHandler
     
     service_name = context.user_data.get("service_name")
     if not service_name:
@@ -199,9 +264,29 @@ def main() -> None:
     # Создание приложения
     application = Application.builder().token(BOT_TOKEN).build()
 
+    # Обработчик для генерации доменных имен через команду
+    generate_handler = ConversationHandler(
+        entry_points=[CommandHandler("generate", generate_command)],
+        states={
+            WAITING_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_email_for_generation)]
+        },
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)]
+    )
+    
+    # Обработчик для генерации доменных имен через кнопку
+    generate_button_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_generate_domains, pattern=f"^{GENERATE}$")],
+        states={
+            WAITING_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_email_for_generation)]
+        },
+        fallbacks=[CommandHandler("cancel", lambda update, context: ConversationHandler.END)]
+    )
+
     # Добавление обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(generate_handler)
+    application.add_handler(generate_button_handler)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_service_name))
     application.add_handler(CallbackQueryHandler(button_callback))
 
